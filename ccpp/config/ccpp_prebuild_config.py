@@ -135,8 +135,6 @@ SCHEME_FILES = [
     'physics/physics/h2ophys.f',
     'physics/physics/samfdeepcnv.f',
     'physics/physics/samfshalcnv.f',
-    'physics/physics/sascnvn.F',
-    'physics/physics/shalcnv.F',
     'physics/physics/maximum_hourly_diagnostics.F90',
     'physics/physics/m_micro.F90',
     'physics/physics/m_micro_pre.F90',
