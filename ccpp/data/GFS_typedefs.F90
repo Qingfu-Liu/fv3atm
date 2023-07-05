@@ -1142,7 +1142,6 @@ module GFS_typedefs
                                             !<     4: New Tiedtke scheme (CAPS)
                                             !<     0: modified Tiedtke's eddy-diffusion shallow conv scheme
                                             !<    -1: no shallow convection used
-    integer              :: imfshalcnv_sas      = 1 !< flag for SAS mass-flux shallow convection scheme
     integer              :: imfshalcnv_samf     = 2 !< flag for SAMF scale- & aerosol-aware mass-flux shallow convection scheme
     integer              :: imfshalcnv_gf       = 3 !< flag for scale- & aerosol-aware Grell-Freitas scheme (GSD)
     integer              :: imfshalcnv_ntiedtke = 4 !< flag for new Tiedtke scheme (CAPS)
@@ -5705,8 +5704,6 @@ module GFS_typedefs
       else
         if (Model%imfshalcnv == 0) then
           print *,' modified Tiedtke eddy-diffusion shallow conv scheme used'
-        elseif (Model%imfshalcnv == Model%imfshalcnv_sas) then
-          print *,' July 2010 version of mass-flux shallow conv scheme used'
         elseif (Model%imfshalcnv == Model%imfshalcnv_samf) then
           print *,' scale- & aerosol-aware mass-flux shallow conv scheme (2017)'
         elseif (Model%imfshalcnv == Model%imfshalcnv_gf) then

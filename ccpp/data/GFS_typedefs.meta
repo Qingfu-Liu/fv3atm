@@ -5173,12 +5173,6 @@
   units = flag
   dimensions = ()
   type = integer
-[imfshalcnv_sas]
-  standard_name = identifier_for_simplified_arakawa_schubert_shallow_convection
-  long_name = flag for SAS shallow convection scheme
-  units = flag
-  dimensions = ()
-  type = integer
 [imfshalcnv_samf]
   standard_name = identifier_for_scale_aware_mass_flux_shallow_convection
   long_name = flag for SAMF shallow convection scheme
