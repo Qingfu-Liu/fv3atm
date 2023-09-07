@@ -283,8 +283,10 @@ module GFS_typedefs
     real (kind=kind_phys), pointer :: vfrac  (:)   => null()  !< vegetation fraction
     integer,               pointer :: vtype  (:)   => null()  !< vegetation type
     integer,               pointer :: stype  (:)   => null()  !< soil type
+    integer,               pointer :: scolor  (:)   => null()  !< soil color
     integer,               pointer :: vtype_save (:) => null()!< vegetation type save
     integer,               pointer :: stype_save (:) => null()!< soil type save
+    integer,               pointer :: scolor_save (:) => null()!< soil color save
     real (kind=kind_phys), pointer :: uustar (:)   => null()  !< boundary layer parameter
     real (kind=kind_phys), pointer :: oro    (:)   => null()  !< orography
     real (kind=kind_phys), pointer :: oro_uf (:)   => null()  !< unfiltered orography
@@ -970,9 +972,9 @@ module GFS_typedefs
     real(kind=kind_phys) :: nssl_cccn      !<  CCN concentration (m-3)
     real(kind=kind_phys) :: nssl_alphah    !<  graupel shape parameter
     real(kind=kind_phys) :: nssl_alphahl   !<  hail shape parameter
-    real(kind=kind_phys) :: nssl_alphar  ! shape parameter for rain (imurain=1 only)                         
-    real(kind=kind_phys) :: nssl_ehw0_in ! constant or max assumed graupel-droplet collection efficiency   
-    real(kind=kind_phys) :: nssl_ehlw0_in! constant or max assumed hail-droplet collection efficiency   
+    real(kind=kind_phys) :: nssl_alphar    ! shape parameter for rain (imurain=1 only)                         
+    real(kind=kind_phys) :: nssl_ehw0      ! constant or max assumed graupel-droplet collection efficiency   
+    real(kind=kind_phys) :: nssl_ehlw0     ! constant or max assumed hail-droplet collection efficiency   
     logical              :: nssl_hail_on   !<  NSSL flag to activate the hail category
     logical              :: nssl_ccn_on    !<  NSSL flag to activate the CCN category
     logical              :: nssl_invertccn !<  NSSL flag to treat CCN as activated (true) or unactivated (false)
@@ -1045,6 +1047,8 @@ module GFS_typedefs
     integer              :: iopt_tbot !lower boundary of soil temperature (1->zero-flux; 2->noah)
     integer              :: iopt_stc  !snow/soil temperature time scheme (only layer 1)
     integer              :: iopt_trs  !thermal roughness scheme (1-z0h=z0m; 2-czil; 3-ec;4-kb inversed)
+    integer              :: iopt_diag !2m t/q diagnostic approach (1->external GFS sfc_diag 2->original NoahMP 2-title 3->NoahMP 
+                                      !2-title + internal GFS sfc_diag  )
 
     ! -- RUC LSM options
     integer              :: mosaic_lu=0     !< control for use of fractional landuse in RUC land surface model
@@ -1078,6 +1082,7 @@ module GFS_typedefs
     real(kind_phys)      :: clm_lake_depth_default !< minimum lake elevation in clm lake model
     logical              :: clm_lake_use_lakedepth !< initialize lake from lakedepth
     logical              :: clm_lake_debug !< verbose debugging in clm_lake
+    logical              :: clm_debug_print !< enables prints in clm_lakedebugging in clm_laki
 
 !--- tuning parameters for physical parameterizations
     logical              :: ras             !< flag for ras convection scheme
@@ -1322,6 +1327,7 @@ module GFS_typedefs
     integer              :: nseed           !< cellular automata seed frequency
     integer              :: nseed_g         !< cellular automata seed frequency
     logical              :: do_ca           !< cellular automata main switch
+    logical              :: ca_advect       !< Advection of cellular automata
     logical              :: ca_sgs          !< switch for sgs ca
     logical              :: ca_global       !< switch for global ca
     logical              :: ca_smooth       !< switch for gaussian spatial filter
@@ -2378,6 +2384,8 @@ module GFS_typedefs
     allocate (Sfcprop%vtype_save (IM))
     allocate (Sfcprop%stype      (IM))
     allocate (Sfcprop%stype_save (IM))
+    allocate (Sfcprop%scolor     (IM))
+    allocate (Sfcprop%scolor_save(IM))
     allocate (Sfcprop%uustar     (IM))
     allocate (Sfcprop%oro        (IM))
     allocate (Sfcprop%oro_uf     (IM))
@@ -2396,6 +2404,8 @@ module GFS_typedefs
     Sfcprop%vtype_save = zero
     Sfcprop%stype      = zero
     Sfcprop%stype_save = zero
+    Sfcprop%scolor      = zero
+    Sfcprop%scolor_save = zero
     Sfcprop%uustar     = clear_val
     Sfcprop%oro        = clear_val
     Sfcprop%oro_uf     = clear_val
@@ -3418,8 +3428,8 @@ module GFS_typedefs
     real(kind=kind_phys) :: nssl_alphah     = 0.0               !<  graupel shape parameter
     real(kind=kind_phys) :: nssl_alphahl    = 1.0               !<  hail shape parameter
     real(kind=kind_phys) :: nssl_alphar     = 0.0               ! shape parameter for rain (imurain=1 only)  
-    real(kind=kind_phys) :: nssl_ehw0_in    = 0.9               ! constant or max assumed graupel-droplet collection efficiency  
-    real(kind=kind_phys) :: nssl_ehlw0_in   = 0.9               ! constant or max assumed hail-droplet collection efficiency  
+    real(kind=kind_phys) :: nssl_ehw0       = 0.9               ! constant or max assumed graupel-droplet collection efficiency  
+    real(kind=kind_phys) :: nssl_ehlw0      = 0.9               ! constant or max assumed hail-droplet collection efficiency  
     logical              :: nssl_hail_on    = .false.           !<  NSSL flag to activate the hail category
     logical              :: nssl_ccn_on     = .true.            !<  NSSL flag to activate the CCN category
     logical              :: nssl_invertccn  = .true.            !<  NSSL flag to treat CCN as activated (true) or unactivated (false)
@@ -3452,6 +3462,7 @@ module GFS_typedefs
     real(kind_phys)      :: clm_lake_depth_default = 50         !< default lake depth in clm lake model
     logical              :: clm_lake_use_lakedepth = .true.     !< initialize depth from lakedepth
     logical              :: clm_lake_debug = .false.            !< verbose debugging in clm_lake
+    logical              :: clm_debug_print = .false.           !< enables prints in clm_lake
 
     !--- land/surface model parameters
     integer              :: lsm            =  1              !< flag for land surface model to use =0  for osu lsm; =1  for noah lsm; =2  for noah mp lsm; =3  for RUC lsm
@@ -3492,6 +3503,8 @@ module GFS_typedefs
     integer              :: iopt_tbot      =  2  !lower boundary of soil temperature (1->zero-flux; 2->noah)
     integer              :: iopt_stc       =  1  !snow/soil temperature time scheme (only layer 1)
     integer              :: iopt_trs       =  2  !thermal roughness scheme (1-z0h=z0m; 2-czil; 3-ec;4-kb reversed)
+    integer              :: iopt_diag      =  2  !2m t/q diagnostic approach (1->external GFS sfc_diag 2->original NoahMP 2-title
+                                                 !3->NoahMP 2-title + internal GFS sfc_diag  )
 
     integer              :: mosaic_lu      =  0  ! 1 - used of fractional landuse in RUC lsm
     integer              :: mosaic_soil    =  0  ! 1 - used of fractional soil in RUC lsm
@@ -3695,7 +3708,7 @@ module GFS_typedefs
                                                              !< nstf_name(5) : zsea2 in mm
 !--- fractional grid
     logical              :: frac_grid       = .false.         !< flag for fractional grid
-    logical              :: frac_ice        = .false.         !< flag for fractional ice when fractional grid is not in use
+    logical              :: frac_ice        = .true.          !< flag for lake fractional ice when fractional grid is not in use
     logical              :: ignore_lake     = .true.          !< flag for ignoring lakes
     real(kind=kind_phys) :: min_lakeice     = 0.15d0          !< minimum lake ice value
     real(kind=kind_phys) :: min_seaice      = 1.0d-11         !< minimum sea  ice value
@@ -3752,6 +3765,7 @@ module GFS_typedefs
     integer              :: iseed_ca       = 1
     integer              :: nspinup        = 1
     logical              :: do_ca          = .false.
+    logical              :: ca_advect      = .false.
     logical              :: ca_sgs         = .false.
     logical              :: ca_global      = .false.
     logical              :: ca_smooth      = .false.
@@ -3885,7 +3899,7 @@ module GFS_typedefs
                                ext_diag_thompson, dt_inner, lgfdlmprad,                     &
                                sedi_semi, decfl,                                            &
                                nssl_cccn, nssl_alphah, nssl_alphahl,                        &
-                               nssl_alphar, nssl_ehw0_in, nssl_ehlw0_in,                    &
+                               nssl_alphar, nssl_ehw0, nssl_ehlw0,                    &
                                nssl_invertccn, nssl_hail_on, nssl_ccn_on,                   &
                           !--- max hourly
                                avg_max_length,                                              &
@@ -3896,7 +3910,7 @@ module GFS_typedefs
                           !    Noah MP options
                                iopt_dveg,iopt_crs,iopt_btr,iopt_run,iopt_sfc, iopt_frz,     &
                                iopt_inf, iopt_rad,iopt_alb,iopt_snf,iopt_tbot,iopt_stc,     &
-                               iopt_trs,                                                    &
+                               iopt_trs, iopt_diag,                                         &
                           !    RUC lsm options
                                mosaic_lu, mosaic_soil, isncond_opt, isncovr_opt,            &
                           !    GFDL surface layer options
@@ -3904,7 +3918,7 @@ module GFS_typedefs
                           !--- lake model control
                                lkm, iopt_lake, lakedepth_threshold, lakefrac_threshold,     &
                                clm_lake_depth_default, clm_lake_use_lakedepth,              &
-                               clm_lake_debug, use_lake2m,                                  &
+                               clm_lake_debug, clm_debug_print, use_lake2m,                 &
                           !--- physical parameterizations
                                ras, trans_trac, old_monin, cnvgwd, mstrat, moist_adj,       &
                                cscnv, cal_pre, do_aw, do_shoc, shocaftcnv, shoc_cld,        &
@@ -3961,7 +3975,7 @@ module GFS_typedefs
                                h0facu, h0facs,                                              &
                           !--- cellular automata
                                nca, ncells, nlives, nca_g, ncells_g, nlives_g, nfracseed,   &
-                               nseed,  nseed_g,  nthresh, do_ca,                              &
+                               nseed,  nseed_g,  nthresh, do_ca, ca_advect,                 &
                                ca_sgs, ca_global,iseed_ca,ca_smooth,                        &
                                nspinup,ca_amplitude,nsmooth,ca_closure,ca_entr,ca_trigger,  &
                           !--- IAU
@@ -4483,8 +4497,8 @@ module GFS_typedefs
     Model%nssl_alphah      = nssl_alphah
     Model%nssl_alphahl     = nssl_alphahl
     Model%nssl_alphar      = nssl_alphar
-    Model%nssl_ehw0_in     = nssl_ehw0_in
-    Model%nssl_ehlw0_in    = nssl_ehlw0_in
+    Model%nssl_ehw0        = nssl_ehw0
+    Model%nssl_ehlw0       = nssl_ehlw0
     Model%nssl_hail_on     = nssl_hail_on
     Model%nssl_ccn_on      = nssl_ccn_on
     Model%nssl_invertccn   = nssl_invertccn
@@ -4638,6 +4652,7 @@ module GFS_typedefs
     Model%clm_lake_depth_default = clm_lake_depth_default
     Model%clm_lake_use_lakedepth = clm_lake_use_lakedepth
     Model%clm_lake_debug = clm_lake_debug
+    Model%clm_debug_print = clm_debug_print
 
 ! Noah MP options from namelist
 !
@@ -4658,6 +4673,7 @@ module GFS_typedefs
     Model%iopt_tbot        = iopt_tbot
     Model%iopt_stc         = iopt_stc
     Model%iopt_trs         = iopt_trs
+    Model%iopt_diag        = iopt_diag
 
 ! RUC lsm options
     Model%mosaic_lu        = mosaic_lu
@@ -4928,6 +4944,7 @@ module GFS_typedefs
     Model%nseed_g          = nseed_g
     Model%ca_global        = ca_global
     Model%do_ca            = do_ca
+    Model%ca_advect        = ca_advect
     Model%ca_sgs           = ca_sgs
     Model%iseed_ca         = iseed_ca
     Model%ca_smooth        = ca_smooth
@@ -5596,6 +5613,7 @@ module GFS_typedefs
         print *,'iopt_tbot   =  ',Model%iopt_tbot
         print *,'iopt_stc   =  ', Model%iopt_stc
         print *,'iopt_trs   =  ', Model%iopt_trs
+        print *,'iopt_diag  =  ', Model%iopt_diag
       elseif (Model%lsm == Model%lsm_ruc) then
         print *,' RUC Land Surface Model used'
         print *, 'The Physics options are'
@@ -5627,6 +5645,7 @@ module GFS_typedefs
           print *,'   clm_lake_use_lakedepth = ',Model%clm_lake_use_lakedepth
           print *,'   clm_lake_depth_default = ',Model%clm_lake_depth_default
           print *,'   clm_lake_debug         = ',Model%clm_lake_debug
+          print *,'   clm_debug_print        = ',Model%clm_debug_print
           print *,'   nlevlake_clm_lake      = ',Model%nlevlake_clm_lake
           print *,'   nlevsoil_clm_lake      = ',Model%nlevsoil_clm_lake
           print *,'   nlevsnow_clm_lake      = ',Model%nlevsnow_clm_lake
@@ -6426,8 +6445,8 @@ module GFS_typedefs
         print *, ' nssl_alphah - graupel shape parameter : ', Model%nssl_alphah
         print *, ' nssl_alphahl - hail shape parameter   : ', Model%nssl_alphahl
         print *, ' nssl_alphar - rain shape parameter : ', Model%nssl_alphar
-        print *, ' nssl_ehw0_in - graupel-droplet collection effiency : ', Model%nssl_ehw0_in 
-        print *, ' nssl_ehlw0_in - hail-droplet collection effiency : ', Model%nssl_ehlw0_in                              
+        print *, ' nssl_ehw0 - graupel-droplet collection effiency : ', Model%nssl_ehw0 
+        print *, ' nssl_ehlw0 - hail-droplet collection effiency : ', Model%nssl_ehlw0                              
         print *, ' nssl_hail_on - hail activation flag   : ', Model%nssl_hail_on
         print *, ' lradar - radar refl. flag             : ', Model%lradar
         print *, ' lrefres                : ', Model%lrefres
@@ -6510,6 +6529,7 @@ module GFS_typedefs
         print *, ' iopt_tbot         : ', Model%iopt_tbot
         print *, ' iopt_stc          : ', Model%iopt_stc
         print *, ' iopt_trs          : ', Model%iopt_trs
+        print *, ' iopt_diag         : ', Model%iopt_diag
       elseif (Model%lsm == Model%lsm_ruc) then
         print *,' RUC Land Surface Model used'
         print *, 'The Physics options are'
@@ -6685,6 +6705,7 @@ module GFS_typedefs
       print *, ' ca_global         : ', Model%ca_global
       print *, ' ca_sgs            : ', Model%ca_sgs
       print *, ' do_ca             : ', Model%do_ca
+      print *, ' ca_advect         : ', Model%ca_advect
       print *, ' iseed_ca          : ', Model%iseed_ca
       print *, ' ca_smooth         : ', Model%ca_smooth
       print *, ' nspinup           : ', Model%nspinup
@@ -6818,6 +6839,10 @@ module GFS_typedefs
       allocate (Grid%ddy_o3    (IM))
       allocate (Grid%jindx1_o3 (IM))
       allocate (Grid%jindx2_o3 (IM))
+
+      Grid%ddy_o3      = clear_val
+      Grid%jindx1_o3   = clear_val
+      Grid%jindx2_o3   = clear_val
     endif
 
 !--- stratosphere h2o active
@@ -6825,6 +6850,10 @@ module GFS_typedefs
       allocate (Grid%ddy_h    (IM))
       allocate (Grid%jindx1_h (IM))
       allocate (Grid%jindx2_h (IM))
+
+      Grid%ddy_h       = clear_val
+      Grid%jindx1_h    = clear_val
+      Grid%jindx2_h    = clear_val
     endif
 
 !--- iccn active
@@ -6835,6 +6864,13 @@ module GFS_typedefs
       allocate (Grid%ddx_ci    (IM))
       allocate (Grid%iindx1_ci (IM))
       allocate (Grid%iindx2_ci (IM))
+
+      Grid%ddy_ci      = clear_val
+      Grid%jindx1_ci   = clear_val
+      Grid%jindx2_ci   = clear_val
+      Grid%ddx_ci      = clear_val
+      Grid%iindx1_ci   = clear_val
+      Grid%iindx2_ci   = clear_val
     endif
 
 !--- iaerclm active
@@ -6845,6 +6881,13 @@ module GFS_typedefs
       allocate (Grid%ddx_aer   (IM))
       allocate (Grid%iindx1_aer(IM))
       allocate (Grid%iindx2_aer(IM))
+
+      Grid%ddy_aer     = clear_val
+      Grid%jindx1_aer  = clear_val
+      Grid%jindx2_aer  = clear_val
+      Grid%ddx_aer     = clear_val
+      Grid%iindx1_aer  = clear_val
+      Grid%iindx2_aer  = clear_val
     endif
 
 !---  Model%do_ugwpv1
@@ -6853,6 +6896,11 @@ module GFS_typedefs
       allocate (Grid%ddy_j2tau  (IM))
       allocate (Grid%jindx1_tau (IM))
       allocate (Grid%jindx2_tau (IM))
+
+      Grid%ddy_j1tau   = clear_val
+      Grid%ddy_j2tau   = clear_val
+      Grid%jindx1_tau  = clear_val
+      Grid%jindx2_tau  = clear_val
    endif
 
  end subroutine grid_create
